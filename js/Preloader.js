@@ -11,13 +11,13 @@ BasicGame.Preloader.prototype = {
     preload: function() {
 
         // Set stage background colour
-        this.game.stage.backgroundColor = '#84CBEC';
+        this.preloadbackground = this.add.sprite(0, 0, 'preloaderStageBackground');
 
         //	These are the assets we loaded in Boot.js
         //	A nice sparkly background and a loading progress bar
-        this.preloadBar_Bground = this.add.sprite(140, 210, 'preloaderBackground');
+        this.preloadBar_Bground = this.add.sprite(180, 110, 'preloaderBackground');
 
-        this.preloadBar = this.add.sprite(140, 210, 'preloaderBar');
+        this.preloadBar = this.add.sprite(180, 110, 'preloaderBar');
         //	This sets the preloadBar sprite as a loader sprite.
         //	What that does is automatically crop the sprite from 0 to full-width
         //	as the files below are loaded in.
@@ -39,6 +39,12 @@ BasicGame.Preloader.prototype = {
         this.game.load.image('cloud', 'assets/cloud_3.png');
         this.game.load.audio('backGroundMusic', 'sounds/SonicBlast.mp3');
 
+        // punch meter
+        this.game.load.spritesheet('punchmeter', 'assets/punch_meter_32_162_5.png', 162, 32);
+
+        // metals
+        this.game.load.spritesheet('metals', 'images/metals_41_75_3.png', 41, 75);
+
 
         // Panel assets
         this.game.load.image('panel', 'assets/gray_panel.png');
@@ -55,9 +61,9 @@ BasicGame.Preloader.prototype = {
         this.game.load.spritesheet('candy2', 'assets/CandyCorn_32_32_5.png', 32, 32, 5);
         this.game.load.spritesheet('candy3', 'assets/JellyBean_32_32_5.png', 32, 32, 5);
 
-        this.game.load.spritesheet('deadlolly1', 'assets/deadlolly1.png', 50, 50);
-        this.game.load.spritesheet('deadlolly2', 'assets/deadlolly2.png', 50, 50);
-        this.game.load.spritesheet('deadlolly3', 'assets/deadlolly3.png', 50, 50);
+        this.game.load.spritesheet('deadcandy1', 'assets/MintyManpeices_32_32_5.png', 32, 32, 5);
+        this.game.load.spritesheet('deadcandy2', 'assets/CandyCornpeices_32_32_5.png', 32, 32, 5);
+        this.game.load.spritesheet('deadcandy3', 'assets/JellyBeanpieces_32_32_5.png', 32, 32, 5);
 
         this.game.load.audio('lollydeath1', 'sounds/lollyscream1.wav');
         this.game.load.audio('lollydeath2', 'sounds/lollyscream2.wav');

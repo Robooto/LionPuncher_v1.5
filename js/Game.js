@@ -12,6 +12,11 @@ BasicGame.Game = function(game) {
         allCandiesLived: 0
     };
     this.challengesComplete = 0; // count of challenges complete
+    this.punchMultiplier = 1; // score multiplier
+    this.multiplierCounter = 0; // count for score multipling
+    this.punchmeter = null; // punch meter image
+    this.punchmeterframe = 0; // punch meter frame holder
+    this.metals = null; // metal sprite sheet
 
     // Initalizing Game Options
     this.startGAme = null;
@@ -21,6 +26,22 @@ BasicGame.Game = function(game) {
     this.lionTimer = null; // Lion Timer
     this.gameOver = false; // Game over toggle
     this.lionSpawnLocations = [];
+
+    // Constants
+    this.GAME_GRAVITY = 1500; // gravity Y constant
+    this.LION_MOVEMENT = {
+        LION_VELOCITY_LOW_L: -150, // lion low range left
+        LION_VELOCITY_HIGH_L: -600, // lion low range left
+        LION_VELOCITY_LOW_R: 150, // lion low range right
+        LION_VELOCITY_HIGH_R: 600 // lion low range right
+    };
+    this.LION_PUNCH = {
+        X_VELOCITY_LOW: -500,
+        X_VELOCITY_HIGH: 500,
+        Y_VELOCITY_LOW: -1000,
+        Y_VELOCITY_HIGH: -1400,
+        Y_ACCELERATION: 3000,
+    };
 
     // game object vars
     this.ground = null; // ground
@@ -52,9 +73,18 @@ BasicGame.Game = function(game) {
     // text vars
     this.scoreText = null;
     this.highScoreText = null;
+    this.scoreMultiplierText = null;
+
+
 
     // text style
     this.style = {
+        stroke: '#727684',
+        strokeThickness: 3,
+        font: '26px Arial',
+        fill: '#ffffff'
+    };
+    this.style2 = {
         stroke: '#727684',
         strokeThickness: 3,
         font: '26px Arial',
@@ -100,11 +130,8 @@ BasicGame.Game.prototype = {
         this.startGame = false;
 
         // background elements
-        this.game.stage.backgroundColor = '#745E36';
-        this.backgroundImg = this.game.add.sprite(0, 1, 'backgroundImg');
-        this.backgroundImg.scale.setTo(2, 3);
-        this.ground = this.game.add.sprite(0, this.game.world.height - 50, 'ground');
-        this.ground.scale.setTo(2, 9); // scale ground
+        this.backgroundImg = this.game.add.sprite(0, 0, 'backgroundImg');
+        this.ground = this.game.add.sprite(0, this.game.world.height - 54, 'ground');
         this.game.physics.enable(this.ground, Phaser.Physics.ARCADE);
         this.ground.body.immovable = true;
         this.ground.body.setSize(1400, 40, 0, 10);
@@ -120,22 +147,57 @@ BasicGame.Game.prototype = {
         // spawn clouds every 5 seconds
         this.game.time.events.loop(Phaser.Timer.SECOND * 5, this.createClouds, this);
 
+        // add in punch meter
+        this.punchmeter = this.game.add.sprite(100, 60, 'punchmeter');
+        this.punchmeter.anchor.setTo(0.5, 0.5);
+
         //music
-        this.soundSwitch = this.game.add.button(860, 20, 'soundicons', this.switchSound, this); //soundswitch
+        this.soundSwitch = this.game.add.button(890, 10, 'soundicons', this.switchSound, this); //soundswitch
 
         // Turn soundSwitch to off if music was turned off
         if (!music.isPlaying) {
-            this.soundSwitch.frame = 1
+            this.soundSwitch.frame = 1;
         }
 
         // Score Text
         this.scoreText = this.game.add.text(16, 4, 'Score: 0', this.style); // x, y, string of text, style
 
+        // Score multiplier
+        this.scoreMultiplierText = this.game.add.text(16, 80, 'Punch Bonus: ', this.style);
+        this.MultiplierText = this.game.add.text(this.scoreMultiplierText.x + 180, this.scoreMultiplierText.y + 17, 'x' + this.punchMultiplier, this.style2);
+        this.MultiplierText.anchor.setTo(0.5, 0.5);
+
         // High Score
-        this.highScoreText = this.game.add.text(240, 4, 'High Score: ' + this.highScore, this.style); // high score  
+        this.highScoreText = this.game.add.text(270, 4, 'High Score: ' + this.highScore, this.style); // high score  
+
+        this.metals = this.game.add.sprite(250, 25, 'metals'); // metal sprites
+        this.metals.anchor.setTo(0.5, 0.5);
+        this.metals.scale.setTo(0.6, 0.6);
+        this.metals.exists = false; // hide metal in the begging
+        this.loadMetal(this.highScore);
 
         // challenges complete
-        this.challText = this.game.add.text(500, 4, 'Challenges Complete: ' + this.challengesComplete, this.style);
+        this.challText = this.game.add.text(580, 4, 'Challenges Complete: ' + this.challengesComplete, this.style);
+
+        // tweens
+        this.getBigger = this.game.add.tween(this.MultiplierText.scale).to({
+            x: 1,
+            y: 1
+        }, 100, Phaser.Easing.Linear.None).to({
+            x: 1.3,
+            y: 1.3
+        }, 500, Phaser.Easing.Linear.None).to({
+            x: 1,
+            y: 1
+        }, 100, Phaser.Easing.Linear.None);
+        // spinning tween
+        this.getSpinning = this.game.add.tween(this.MultiplierText).to({
+            angle: 15
+        }, 500, Phaser.Easing.Linear.None).to({
+            angle: -15
+        }, 500, Phaser.Easing.Linear.None).to({
+            angle: 0
+        }, 500, Phaser.Easing.Linear.None);
 
         // create candy group
         this.candyGroup = this.game.add.group();
@@ -144,39 +206,28 @@ BasicGame.Game.prototype = {
 
         // create our 3 candies
         this.candy1 = this.candyGroup.create(400 + (40 * 1), this.game.height - 79, 'candy1');
+        this.candy1.name = 'candy1';
         this.candy1.animations.add('passive');
         this.candy1anim = this.candy1.animations.play('passive', 15, true);
         this.candy1anim.onLoop.add(this.candySwitch, this);
         this.candy1.anchor.setTo(0.5, 0.5);
-        this.candy1.scale.setTo(2.5, 2.5);
+        this.candy1.scale.setTo(2, 2);
 
         this.candy2 = this.candyGroup.create(400 + (40 * 2), this.game.height - 79, 'candy2');
+        this.candy2.name = 'candy2';
         this.candy2.animations.add('passive');
         this.candy2anim = this.candy2.animations.play('passive', 15, true);
         this.candy2anim.onLoop.add(this.candySwitch, this);
         this.candy2.anchor.setTo(0.5, 0.5);
-        this.candy2.scale.setTo(2.5, 2.5);
+        this.candy2.scale.setTo(2, 2);
 
         this.candy3 = this.candyGroup.create(400 + (40 * 3), this.game.height - 79, 'candy3');
+        this.candy3.name = 'candy3';
         this.candy3.animations.add('passive');
         this.candy3anim = this.candy3.animations.play('passive', 15, true);
         this.candy3anim.onLoop.add(this.candySwitch, this);
         this.candy3.anchor.setTo(0.5, 0.5);
-        this.candy3.scale.setTo(2.5, 2.5);
-
-        /* 
-        for (var i = 1; i < 4; i++) {
-            this.candy = this.candyGroup.create(400 + (40 * i), this.game.height - 18, 'candy' + i);
-            this.candy.name = 'candy' + i;
-            this.candy.anchor.setTo(0.5, 0.5); // candies rotate from base
-
-           // bobbing lollies to the beat 
-            this.game.add.tween(this.lolly).to({
-                angle: 12
-            }, 390, Phaser.Easing.Linear.None).to({
-                angle: -12
-            }, 390, Phaser.Easing.Linear.None).loop().start(); 
-        } */
+        this.candy3.scale.setTo(2, 2);
 
         // lolly death sounds
         this.lollydeath1_s = this.add.audio('lollydeath1');
@@ -203,7 +254,7 @@ BasicGame.Game.prototype = {
 
         // Create Fist
         this.punch = this.game.add.sprite(this.game.world.width / 2, this.game.world.height / 2 - 100, 'punch');
-        this.punch.anchor.setTo(.5, .5);
+        this.punch.anchor.setTo(0.5, 0.5);
         this.punch.scale.x = -1; // making the fist display in the correct direction
         this.game.physics.enable(this.punch, Phaser.Physics.ARCADE); // this is the way to enable physics 
         this.punch.body.allowRotation = false; // let Physics do the rotation
@@ -286,8 +337,8 @@ BasicGame.Game.prototype = {
         this.panelTitle = this.game.add.text(270, 70, 'Punch Lions to protect the Candies', this.panelTitleText);
         this.panelChall = this.game.add.text(355, 115, 'Challenge Punches', this.panelChallText);
         this.panelChall1 = this.game.add.text(340, 158, 'Punch over 100 Lions', this.panelText);
-        this.panelChall2 = this.game.add.text(340, 203, 'A Candy survives over 60 sec', this.panelText);
-        this.panelChall3 = this.game.add.text(340, 249, 'All Candies survive for 20 sec', this.panelText);
+        this.panelChall2 = this.game.add.text(340, 203, 'One Candy survives over 60 sec', this.panelText);
+        this.panelChall3 = this.game.add.text(340, 249, 'All Candies survive over 20 sec', this.panelText);
         this.challStar1 = this.game.add.sprite(285, 150, 'goldstar');
         this.challStar2 = this.game.add.sprite(285, 195, 'goldstar');
         this.challStar3 = this.game.add.sprite(285, 239, 'goldstar');
@@ -316,6 +367,8 @@ BasicGame.Game.prototype = {
             this.panelChall2.text = 'The Candies survived for ' + this.totalTimeCandiesLived + ' seconds';
             this.panelChall3.text = 'All Candies survived for ' + this.totalTimeAllCandiesLived + ' seconds';
 
+
+            // change the starts to the other frame once the challenges are complete.
             if (this.punchesThrown > 100 || this.chanComplete.punches === 1) {
                 this.challStar1.frame = 0;
                 this.chanComplete.punches = 1;
@@ -347,7 +400,7 @@ BasicGame.Game.prototype = {
         // Tween in from top of screen
         this.game.add.tween(this.intropanel).from({
             y: -400
-        }, 1000, Phaser.Easing.Quadratic.In, true);
+        }, 1000, Phaser.Easing.Bounce.Out, true);
 
     },
 
@@ -359,7 +412,7 @@ BasicGame.Game.prototype = {
         // switching lions on the left or right side of screen
         if (lion) {
             this.lionReset(this.score, lion);
-            lion.scale.setTo(2.5, 2.5); // scaling everything up
+            lion.scale.setTo(2, 2); // scaling everything up
             lion.animations.add('punch', [15, 16, 17]);
             lion.animations.add('run', [9, 10, 11, 12, 13, 14]);
             lion.animations.add('walk', [0, 1, 2, 3, 4, 5, 6, 7]);
@@ -369,16 +422,15 @@ BasicGame.Game.prototype = {
                 left: true,
                 right: true
             }; // since we are recycling we need to set collisions up again
-            lion.body.gravity.y = 1500; // add gravity to lions
+            lion.body.gravity.y = this.GAME_GRAVITY; // add gravity to lions
             lion.body.velocity.setTo(0, 0); // Stop moving
             lion.body.acceleration.setTo(0, 0); // Stop accelerating
 
             // If lion spawns on left move left if right move right
             if (lion.x > 480) {
-
-                this.velocity_R = this.game.rnd.integerInRange(-150, -600); // Move left
-                lion.body.velocity.x = this.velocity_R
-                lion.scale.x = -2.5;
+                this.velocity_L = this.game.rnd.integerInRange(this.LION_MOVEMENT.LION_VELOCITY_LOW_L, this.LION_MOVEMENT.LION_VELOCITY_HIGH_L); // Move left
+                lion.body.velocity.x = this.velocity_L
+                lion.scale.x = -2;
 
                 if (this.velocity_R > -250) {
                     lion.animations.play('walk', 15, true);
@@ -387,9 +439,9 @@ BasicGame.Game.prototype = {
 
                 }
             } else {
-                this.velocity_L = this.game.rnd.integerInRange(150, 600); // Move right
-                lion.body.velocity.x = this.velocity_L
-
+                this.velocity_R = this.game.rnd.integerInRange(this.LION_MOVEMENT.LION_VELOCITY_LOW_R, this.LION_MOVEMENT.LION_VELOCITY_HIGH_R); // Move right
+                lion.body.velocity.x = this.velocity_R
+                lion.scale.x = 2;
                 if (this.velocity_L < 250) {
                     lion.animations.play('walk', 15, true);
                 } else {
@@ -415,8 +467,11 @@ BasicGame.Game.prototype = {
         var y = 0;
 
         // as the score grows increase the spawn locations
-        if (score === 200) {
-            this.lionSpawnLocations.push("b_left", "b_right");
+        if (score > 200) {
+            this.lionSpawnLocations = ["left", "right", "b_left"];
+        }
+        if (score > 800) {
+            this.lionSpawnLocations = ["left", "right", "b_left", "b_right"];
         }
 
         // select random spawn location
@@ -449,6 +504,8 @@ BasicGame.Game.prototype = {
 
         this.missedLion = true; // missed punch flag
 
+
+
         // add tween to simulate punch feedback
         this.game.add.tween(this.punch.scale).to({
             x: -.4,
@@ -470,9 +527,9 @@ BasicGame.Game.prototype = {
                     left: false,
                     right: false
                 }; // stop checking for collisions when punched
-                lion.body.velocity.y = this.game.rnd.integerInRange(-600, -1200);
-                lion.body.velocity.x = this.game.rnd.integerInRange(-500, 500);
-                lion.body.acceleration.y = 3000;
+                lion.body.velocity.y = this.game.rnd.integerInRange(this.LION_PUNCH.Y_VELOCITY_LOW, this.LION_PUNCH.Y_VELOCITY_HIGH);
+                lion.body.velocity.x = this.game.rnd.integerInRange(this.LION_PUNCH.X_VELOCITY_LOW, this.LION_PUNCH.X_VELOCITY_HIGH);
+                lion.body.acceleration.y = this.LION_PUNCH.Y_ACCELERATION;
                 lion.angle = 270;
                 lion.animations.play('punch', 10, false); //play the punch animation only once
 
@@ -481,10 +538,12 @@ BasicGame.Game.prototype = {
                 // select a random punch sound to play
                 this.game.rnd.pick([this.punch1_s, this.punch2_s, this.punch3_s]).play();
 
-                this.updateScore(10); // add 10 to score
+                this.updateScore(10, this.punchMultiplier); // add 10 to score
 
                 this.punchesThrown++; //add 1 to punches thrown
 
+                this.multiplierCounter++;
+                this.comboCounter(this.multiplierCounter); // add to count for every lion hit
 
             }
 
@@ -493,7 +552,14 @@ BasicGame.Game.prototype = {
         // play missed sound when no lion is hit
         if (this.missedLion) {
             this.misspunch_s.play();
+            this.multiplierCounter = 0; // reset counter on miss
+            this.punchmeter.frame = 0; // reset punch meter
+            this.punchMultiplier = 1;
+            this.MultiplierText.text = 'x' + this.punchMultiplier;
+            this.MultiplierText.fill = '#FFFFFF';
         }
+
+
     },
 
     // interaction between lion and candy
@@ -507,6 +573,7 @@ BasicGame.Game.prototype = {
         this.createDeadLolly(1, candy);
         this.createDeadLolly(2, candy);
         this.createDeadLolly(3, candy);
+        this.createDeadLolly(4, candy);
 
         this.candiesAlive--;
 
@@ -525,9 +592,9 @@ BasicGame.Game.prototype = {
     candySwitch: function(candy, animation) {
 
         if (animation.loopCount === 5) {
-            candy.scale.x = -2.5;
+            candy.scale.x = -2;
         } else if (animation.loopCount === 10) {
-            candy.scale.x = 2.5;
+            candy.scale.x = 2;
             animation.loopCount = 1;
 
         }
@@ -537,15 +604,18 @@ BasicGame.Game.prototype = {
     // create candy dead pieces
     createDeadLolly: function(frame, candy) {
 
-        // use the correct dead candy image
-        if (candy === 'candy1') {
-            this.deadLolly = 'deadlolly1';
-        } else if (candy === 'candy2') {
-            this.deadLolly = 'deadlolly2';
+        // use the correct dead candy image (this is broken in 1.5)
+        if (candy.name === 'candy1') {
+            this.deadLolly = 'deadcandy1';
+        } else if (candy.name === 'candy2') {
+            this.deadLolly = 'deadcandy2';
         } else {
-            this.deadLolly = 'deadlolly3';
+            this.deadLolly = 'deadcandy3';
         }
+
+        // I will update this when I create new candy parts
         lollypart = this.game.add.sprite(candy.x, candy.y, this.deadLolly, frame);
+        lollypart.scale.setTo(2, 2);
         this.game.physics.enable(lollypart, Phaser.Physics.ARCADE);
         lollypart.angle = this.game.rnd.integerInRange(0, 360);
         lollypart.body.velocity.x = this.game.rnd.integerInRange(-120, 120);
@@ -560,28 +630,73 @@ BasicGame.Game.prototype = {
 
     },
 
+    // score combo
+    comboCounter: function(count) {
+
+        if (count === 1) {
+            this.punchmeter.frame = 1;
+        } else if (count === 2) {
+            this.punchmeter.frame = 2;
+        } else if (count === 3) {
+            this.punchmeter.frame = 3;
+        } else if (count === 4) {
+            this.punchmeter.frame = 4;
+            this.punchMultiplier = 2;
+            this.MultiplierText.text = 'x' + this.punchMultiplier;
+            this.MultiplierText.fill = '#EAFF00';
+
+            // larger tween
+            this.getBigger.start();
+            // spinning tween
+            this.getSpinning.start();
+
+
+
+
+        } else if (count === 8) {
+            this.punchMultiplier = 3;
+            this.MultiplierText.text = 'x' + this.punchMultiplier;
+            this.MultiplierText.fill = '#FF8300';
+            this.getBigger.start();
+            this.getSpinning.start();
+        } else if (count === 15) {
+            this.punchMultiplier = 4;
+            this.MultiplierText.text = 'x' + this.punchMultiplier;
+            this.MultiplierText.fill = '#AA0114';
+            this.getBigger.start();
+            this.getSpinning.start();
+        }
+    },
+
     // add score and adjust the spawn timer
-    updateScore: function(addScore) {
-        this.score += addScore; // update the score when each lion is hit
+    updateScore: function(addScore, multiplier) {
+        this.score += (addScore * multiplier); // update the score when each lion is hit adding in score modifier for punches
         this.scoreText.text = 'Score: ' + this.score;
 
         // lions spawn faster as score increases spawn timer is in seconds
-        if (this.score === 70) {
+        if (this.score > 100) {
             this.lionSpawnTimer = .7;
-        } else if (this.score === 150) {
+        }
+        if (this.score > 350) {
+            this.lionSpawnTimer = .65;
+        }
+        if (this.score > 500) {
             this.lionSpawnTimer = .6;
-        } else if (this.score === 300) {
-            this.lionSpawnTimer = .55;
-        } else if (this.score === 500) {
-            this.lionSpawnTimer = .5;
-        } else if (this.score === 600) {
-            this.lionSpawnTimer = .45;
-        } else if (this.score === 700) {
-            this.lionSpawnTimer = .3;
-        } else if (this.score === 800) {
-            this.lionSpawnTimer = .275;
-        } else if (this.score === 900) {
-            this.lionSpawnTimer = .1;
+        }
+        if (this.score > 700) {
+            this.lionSpawnTimer = .555;
+        }
+        if (this.score > 900) {
+            this.lionSpawnTimer = .52;
+        }
+        if (this.score > 1300) {
+            this.lionSpawnTimer = .505;
+        }
+        if (this.score > 1700) {
+            this.lionSpawnTimer = .480;
+        }
+        if (this.score > 2500) {
+            this.lionSpawnTimer = .450;
         }
 
         // add tween to score when it is higher than highscore
@@ -626,8 +741,10 @@ BasicGame.Game.prototype = {
             x: 1400
         }, 1000, Phaser.Easing.Bounce.Out, true);
 
+        // bring the fist to the top of the stack
         this.punch.bringToTop();
 
+        // credit panel can be clicked anywhere to close
         this.creditPanel.inputEnabled = true;
         this.creditPanel.events.onInputUp.add(function() {
             this.game.add.tween(this.creditGroup).to({
@@ -644,6 +761,10 @@ BasicGame.Game.prototype = {
             this.highScore = this.score
         }
 
+        // load metal if the user scored enough
+
+        this.loadMetal(this.highScore);
+
         //	Reset score, stop music, and start the game over
         this.score = 0;
         this.candiesAlive = 3;
@@ -653,13 +774,26 @@ BasicGame.Game.prototype = {
 
     },
 
+    // load metal depending on score
+    loadMetal: function(score) {
+        if (score > 1000) {
+            this.metals.exists = true;
+        }
+        if (score > 2000) {
+            this.metals.frame = 1;
+        }
+        if (score > 3000) {
+            this.metals.frame = 2;
+        }
+    },
+
     render: function() {
         // adding debug info
-        // this.game.debug.spriteBounds(this.ground);
-        //  this.game.debug.bodyInfo(this.ground, 32, 300);
-        //  this.game.debug.body(this.ground);
-        // this.game.debug.spriteCorners(this.lionGroup, true, true);
-        // this.game.debug.spriteInfo(this.punch, 32, 200);
+        //this.game.debug.spriteBounds(this.ground);
+        //this.game.debug.bodyInfo(this.ground, 32, 300);
+        //this.game.debug.body(this.ground);
+        //this.game.debug.spriteCorners(this.lionGroup, true, true);
+        //this.game.debug.spriteInfo(this.ground, 32, 200);
     }
 
 

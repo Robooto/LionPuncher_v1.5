@@ -11,26 +11,25 @@ BasicGame = {
 
 };
 
-BasicGame.Boot = function (game) {
-};
+BasicGame.Boot = function(game) {};
 
 BasicGame.Boot.prototype = {
 
-    preload: function () {
+    preload: function() {
 
         //  Here we load the assets required for our preloader (in this case a background and a loading bar)
+        this.load.image('preloaderStageBackground', 'assets/preloadbackground.png');
         this.load.image('preloaderBackground', 'assets/preloadr_bar_background.png');
         this.load.image('preloaderBar', 'assets/preloadr_bar.png');
 
     },
 
-    create: function () {
+    create: function() {
 
         this.input.maxPointers = 1;
         this.stage.disableVisibilityChange = true;
 
-        if (this.game.device.desktop)
-        {
+        if (this.game.device.desktop) {
             this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
             this.scale.minWidth = 480;
             this.scale.minHeight = 320;
@@ -39,9 +38,7 @@ BasicGame.Boot.prototype = {
             this.scale.pageAlignHorizontally = true;
             this.scale.pageAlignVertically = true;
             this.scale.setScreenSize(true);
-        }
-        else
-        {
+        } else {
             this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
             this.scale.minWidth = 480;
             this.scale.minHeight = 320;
@@ -60,14 +57,14 @@ BasicGame.Boot.prototype = {
 
     },
 
-    gameResized: function (width, height) {
+    gameResized: function(width, height) {
 
         //  This could be handy if you need to do any extra processing if the game resizes.
         //  A resize could happen if for example swapping orientation on a device.
 
     },
 
-    enterIncorrectOrientation: function () {
+    enterIncorrectOrientation: function() {
 
         BasicGame.orientated = false;
 
@@ -75,7 +72,7 @@ BasicGame.Boot.prototype = {
 
     },
 
-    leaveIncorrectOrientation: function () {
+    leaveIncorrectOrientation: function() {
 
         BasicGame.orientated = true;
 
